@@ -26,6 +26,8 @@ interface TerminalLog {
   time: string;
 }
 
+const API_BASE = typeof window !== "undefined" && window.location.protocol === "file:" ? "http://127.0.0.1:5173" : "";
+
 export function WeeklyRadar({
   onAddProject,
   notify,
@@ -44,7 +46,7 @@ export function WeeklyRadar({
 
   // 1. 获取本地环境状态及已有的本周选题
   useEffect(() => {
-    fetch("/api/automation/status")
+    fetch(`${API_BASE}/api/automation/status`)
       .then((res) => res.json())
       .then((data) => {
         setInfra(data);
@@ -84,7 +86,7 @@ export function WeeklyRadar({
     ]);
 
     try {
-      const eventSource = new EventSource("/api/automation/weekly-extract");
+      const eventSource = new EventSource(`${API_BASE}/api/automation/weekly-extract`);
 
       eventSource.addEventListener("log", (e) => {
         const payload = JSON.parse(e.data);
@@ -130,7 +132,7 @@ export function WeeklyRadar({
 
   // 3. 唤醒本地 Obsidian
   const openObsidian = (file: string) => {
-    fetch("/api/automation/open-obsidian", {
+    fetch(`${API_BASE}/api/automation/open-obsidian`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file }),

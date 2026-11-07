@@ -391,6 +391,16 @@ export function automationPlugin() {
       server.middlewares.use((req, res, next) => {
         const url = new URL(req.url || "", `http://${req.headers.host}`);
 
+        // 跨域支持 (允许从本地静态文件直接请求)
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        if (req.method === "OPTIONS") {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
         // 1. 检查各本地基础设施状态
         if (url.pathname === "/api/automation/status" && req.method === "GET") {
           const hasOtusDb = fs.existsSync(OTUS_DB_PATH);
