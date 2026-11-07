@@ -184,12 +184,12 @@ export function fmt(n: number): string {
 
 export function statusLabel(status: Draft["status"]): string {
   const map: Record<Draft["status"], string> = {
-    idea: "Idea · To record",
-    scripting: "Scripting · To record",
-    recorded: "Recorded",
-    editing: "Editing",
-    final: "Final",
-    published: "Published",
+    idea: "灵感构思",
+    scripting: "文案撰写",
+    recorded: "录制完毕",
+    editing: "后期剪辑",
+    final: "定稿就绪",
+    published: "已发布",
   };
   return map[status];
 }
@@ -290,12 +290,12 @@ export const PROJECT_STATUS_KEYS = ["idea", "writing", "to-record", "editing", "
 
 export function projectStatusLabel(status: Project["status"]): string {
   const map: Record<Project["status"], string> = {
-    idea: "Idea",
-    writing: "Writing",
-    "to-record": "To Record",
-    editing: "Editing",
-    "ready-to-publish": "Ready to Publish",
-    published: "Published",
+    idea: "灵感立项",
+    writing: "文案撰写",
+    "to-record": "待录视频",
+    editing: "后期剪辑",
+    "ready-to-publish": "准备发布",
+    published: "已发布",
   };
   return map[status] ?? status;
 }

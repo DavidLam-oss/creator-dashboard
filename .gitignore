@@ -3,3 +3,4 @@ dist/
 tsconfig.tsbuildinfo
 .DS_Store
 *.local
+eva-video-style/
