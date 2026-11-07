@@ -117,56 +117,100 @@ function queryWReportDeepDiscussions() {
   }
   try {
     // 1. 获取近期的活跃会话列表
-    const sessionOut = execSync(`"${W_REPORT_BIN}" list-sessions --limit 20`, {
+    const sessionOut = execSync(`"${W_REPORT_BIN}" list-sessions --limit 50`, {
       encoding: "utf-8",
-      timeout: 8000,
+      timeout: 10000,
     });
-    const allSessions = sessionOut
+    const lines = sessionOut
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean);
 
-    // 过滤掉生活/家校群
-    const ignorePatterns = ["小三班", "禁言群", "通知", "班级", "业主"];
-    const techSessions = allSessions.filter((s) => {
-      const isGroup = s.includes("[group]");
-      const isIgnored = ignorePatterns.some((p) => s.includes(p));
-      return isGroup && !isIgnored;
-    });
+    // 严格过滤生活、家校、广告、亲友、买菜等日常噪音群
+    const ignorePatterns = [
+      "小三班", "禁言群", "通知", "班级", "业主", "宠粉", "福利", 
+      "生活", "快递", "物业", "约会", "吃嘛嘛香", "挑战赛", "校友群", 
+      "亲友", "相亲", "买菜", "团购", "保龄球"
+    ];
+    // 聚焦独立开发、技术构建、内容创作、AI工具链社群
+    const techKeywords = [
+      "Obsidian", "Vibe Writing", "Rap Hackathon", "Hackathon", "小龙虾", 
+      "大肥鱼", "AI 编程", "AI 折腾", "出海", "克劳德", "书情", "We API", 
+      "AI Life", "哥飞的朋友们", "DSH", "衣正元", "赫兹"
+    ];
 
-    // 2. 深入抓取几个高信号技术交流群的真实对话切片
+    const matchedSessions = [];
+    for (const l of lines) {
+      if (!l.includes("[group]")) continue;
+      if (ignorePatterns.some((p) => l.includes(p))) continue;
+      const m = l.match(/(\d{2}-\d{2}\s+\d{2}:\d{2})\s+\[group\]\s+(.*?)\s+\((.*?)\)/);
+      if (m) {
+        const [, time, name, id] = m;
+        const isTech = techKeywords.some((kw) => name.toLowerCase().includes(kw.toLowerCase()));
+        if (isTech) {
+          matchedSessions.push({ time, name, id });
+        }
+      }
+    }
+
+    // 2. 深入抓取前 8 组高信号技术交流群的真实对话切片
     const discussions = [];
-    const targetGroups = ["AI 编程", "小龙虾", "大肥鱼", "Rap Hackathon"];
+    const targetSessions = matchedSessions.slice(0, 8);
 
-    for (const g of targetGroups) {
+    for (const s of targetSessions) {
       try {
-        const historyOut = execSync(`"${W_REPORT_BIN}" history "${g}" --days 7 --limit 15`, {
+        const historyOut = execSync(`"${W_REPORT_BIN}" history "${s.id}" --days 7 --limit 30`, {
           encoding: "utf-8",
-          timeout: 8000,
+          timeout: 10000,
         });
         const data = JSON.parse(historyOut);
-        const groupName = data.chat?.display_name || g;
-        const textMsgs = (data.messages || [])
-          .filter((m) => m.message_type?.base === "text" && m.content?.text?.text)
-          .map((m) => ({
-            sender: m.sender?.display_name || "同行",
-            text: m.content.text.text.trim().replace(/\n+/g, " "),
-          }))
-          .filter((m) => m.text.length >= 4 && !m.text.startsWith("[小程序]") && !m.text.startsWith("[收到]"));
+        const groupName = data.chat?.display_name || s.name;
 
-        if (textMsgs.length > 0) {
+        // 提取纯文本、引用回复 (quote)、文章分享 (link)
+        const validMsgs = (data.messages || [])
+          .map((m) => {
+            let text = "";
+            if (m.message_type?.base === "text") {
+              text = m.content?.text?.text || "";
+            } else if (m.message_type?.base === "quote") {
+              const reply = m.content?.quote?.reply_text || m.content?.text?.text || "";
+              let ref = m.content?.quote?.ref_text || "";
+              ref = ref.replace(/<[^>]+>/g, "").slice(0, 30);
+              text = ref ? `(回复「${ref}」) ${reply}` : reply;
+            } else if (m.message_type?.base === "link") {
+              const title = m.content?.link?.title || "";
+              const desc = m.content?.link?.summary || "";
+              text = `[分享文章] 《${title}》${desc ? " · " + desc.slice(0, 45) : ""}`;
+            }
+
+            text = text.replace(/<[^>]+>/g, "").replace(/\n+/g, " ").trim();
+            const sender = m.sender?.is_self ? "我 (林大友)" : (m.sender?.display_name || "同行");
+            return { sender, text };
+          })
+          .filter((m) => {
+            return (
+              m.text &&
+              m.text.length >= 2 &&
+              !m.text.startsWith("[小程序]") &&
+              !m.text.startsWith("[表情]") &&
+              !m.text.startsWith("<?xml")
+            );
+          });
+
+        if (validMsgs.length > 0) {
           discussions.push({
             groupName,
-            messages: textMsgs.slice(0, 7),
+            time: s.time,
+            messages: validMsgs.slice(0, 15),
           });
         }
       } catch (e) {
-        console.warn(`[w-report history error: ${g}]`, e.message);
+        console.warn(`[w-report history error: ${s.name}]`, e.message);
       }
     }
 
     return {
-      recentSessions: techSessions.slice(0, 8),
+      recentSessions: matchedSessions.map((s) => `[${s.time}] 💬 ${s.name}`),
       discussions,
     };
   } catch (err) {
